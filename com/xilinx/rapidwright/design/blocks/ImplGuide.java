@@ -28,6 +28,7 @@ package com.xilinx.rapidwright.design.blocks;
 import java.io.BufferedWriter;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -117,10 +118,18 @@ public class ImplGuide {
 				}
 				case IMPL:{
 					int index = Integer.parseInt(tokens[1]);
-					int subImplCount = Integer.parseInt(tokens[2]);
-					StringBuilder sb = new StringBuilder(checkPblockValid(ig, lineNumber, tokens[3]));
+					int subImplCount = 0;
+					int tokenIdx = 0;
+					try{
+						subImplCount = Integer.parseInt(tokens[2]);
+					}catch (NumberFormatException e){
+						subImplCount = 0;
+						tokenIdx = -1;
+					}
 					
-					for(int i=4; i < tokens.length; i++){
+					StringBuilder sb = new StringBuilder(checkPblockValid(ig, lineNumber, tokens[3+tokenIdx]));
+					
+					for(int i=4+tokenIdx; i < tokens.length; i++){
 						sb.append(" ");
 						sb.append(checkPblockValid(ig, lineNumber, tokens[i]));
 					}
@@ -292,11 +301,24 @@ public class ImplGuide {
 	
 	/**
 	 * Adds a block to this implementation guide
-	 * @param blockGuide
-	 * @return
+	 * @param blockGuide The block to add.
+	 * @return Previous block guide with the same cache ID.
 	 */
 	public BlockGuide addBlock(BlockGuide blockGuide){
 		return blockGuides.put(blockGuide.getCacheID(), blockGuide);
+	}
+	
+	/**
+	 * Creates a new block guide with the associated cache ID and
+	 * adds it to the impl guide.
+	 * @param cacheID The Vivado cache ID for the block to be created
+	 * @return The newly created block guide
+	 */
+	public BlockGuide createBlockGuide(String cacheID){
+		BlockGuide bg = new BlockGuide();
+		bg.setCacheID(cacheID);
+		addBlock(bg);
+		return bg;
 	}
 	
 	public Set<String> getBlockNames(){
@@ -307,13 +329,31 @@ public class ImplGuide {
 		return blockGuides.get(id);
 	}
 	
+	public BlockGuide removeBlock(String id){
+		return blockGuides.remove(id);
+	}
+	
+	public void removeBlocksWithoutPBlocks(){
+		ArrayList<BlockGuide> toRemove = new ArrayList<>();
+		for(BlockGuide bg : getBlocks()){
+			boolean isNull = false; 
+			for(PBlock pb : bg.getImplementations()){
+				if(pb == null) isNull = true;
+			}
+			if(isNull) toRemove.add(bg);
+		}
+		for(BlockGuide bg : toRemove){
+			removeBlock(bg.getCacheID());
+		}
+	}
+	
 	public boolean hasBlock(String id){
 		return blockGuides.containsKey(id);
 	}
 	
 	public static void main(String[] args) {
 		if(args.length != 2){
-			MessageGenerator.briefMessageAndExit("USAGE: <input.impl.guide> <output.impl.guide>");
+			MessageGenerator.briefMessageAndExit("USAGE: <input.igf> <output.igf>");
 		}
 		ImplGuide ig = readImplGuide(args[0]);
 		ig.writeImplGuide(args[1]);
